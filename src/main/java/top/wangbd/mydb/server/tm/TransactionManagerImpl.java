@@ -1,6 +1,6 @@
 package top.wangbd.mydb.server.tm;
 
-import top.wangbd.mydb.server.common.Error;
+import top.wangbd.mydb.common.Error;
 import top.wangbd.mydb.server.utils.Panic;
 import top.wangbd.mydb.server.utils.Parser;
 
