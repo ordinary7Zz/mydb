@@ -4,6 +4,9 @@ import top.wangbd.mydb.server.dm.pageCache.PageCache;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+/**
+ * 页面实现类
+ */
 public class PageImpl implements Page{
     private int pageNumber; // 页号
     private byte[] data; // 页数据
@@ -21,36 +24,36 @@ public class PageImpl implements Page{
 
     @Override
     public void lock() {
-
+        lock.lock();
     }
 
     @Override
     public void unlock() {
-
+        lock.unlock();
     }
 
     @Override
     public void release() {
-
+        pc.release(this);
     }
 
     @Override
     public void setDirty(boolean dirty) {
-
+        this.dirty = dirty;
     }
 
     @Override
     public boolean isDirty() {
-        return false;
+        return dirty;
     }
 
     @Override
     public int getPageNumber() {
-        return 0;
+        return pageNumber;
     }
 
     @Override
     public byte[] getData() {
-        return new byte[0];
+        return data;
     }
 }

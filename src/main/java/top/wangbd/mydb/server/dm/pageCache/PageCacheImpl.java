@@ -36,11 +36,15 @@ public class PageCacheImpl extends AbstractCache<Page> implements PageCache {
         return (pgno-1) * PAGE_SIZE;
     }
 
+    /**
+     * 将页面数据写回到文件中
+     */
     private void flush(Page pg) {
         int pgno = pg.getPageNumber();
         long offset = pageOffset(pgno);
         fileLock.lock();
         try {
+            //用 wrap() 将页面数据包装成 ByteBuffer,然后通过 FileChannel.write() 写入文件
             ByteBuffer buf = ByteBuffer.wrap(pg.getData());
             fc.position(offset);
             fc.write(buf);
@@ -61,34 +65,63 @@ public class PageCacheImpl extends AbstractCache<Page> implements PageCache {
         return pgno;
     }
 
+    /**
+     * 获取指定页号的页面，读取到缓存中
+     */
     @Override
     public Page getPage(int pgno) throws Exception {
-        return null;
+        // 通过调用 AbstractCache 的 get 方法，从缓存或数据源（文件系统）获取页面
+        return get((long)pgno);
     }
 
+    /**
+     * 关闭页面缓存并释放相关资源
+     */
     @Override
     public void close() {
-
+        super.close();
+        try {
+            fc.close();
+            file.close();
+        } catch (IOException e) {
+            Panic.panic(e);
+        }
     }
 
+    /**
+     * 释放页面
+     */
     @Override
     public void release(Page page) {
-
+        // 调用AbstractCache的 release 方法，传入页号作为键
+        release((long)page.getPageNumber());
     }
 
+    /**
+     * 把数据库文件截断到只保留页号 (1..maxPgno) 对应的字节。
+     */
     @Override
     public void truncateByBgno(int maxPgno) {
-
+        long size = pageOffset(maxPgno + 1);
+        fileLock.lock();
+        try {
+            file.setLength(size);
+        } catch (IOException e) {
+            Panic.panic(e);
+        } finally {
+            fileLock.unlock();
+        }
+        pageNumbers.set(maxPgno);
     }
 
     @Override
     public int getPageNumber() {
-        return 0;
+        return pageNumbers.intValue();
     }
 
     @Override
     public void flushPage(Page pg) {
-
+        flush(pg);
     }
 
     /**

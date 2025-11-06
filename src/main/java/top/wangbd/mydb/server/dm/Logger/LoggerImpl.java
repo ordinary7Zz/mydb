@@ -1,0 +1,252 @@
+package top.wangbd.mydb.server.dm.Logger;
+
+import com.google.common.primitives.Bytes;
+import top.wangbd.mydb.common.Error;
+import top.wangbd.mydb.server.utils.Panic;
+import top.wangbd.mydb.server.utils.Parser;
+
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.util.Arrays;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+public class LoggerImpl implements Logger{
+    private static final int SEED = 13331;
+
+    private static final int OF_SIZE = 0;
+    private static final int OF_CHECKSUM = OF_SIZE + 4;
+    private static final int OF_DATA = OF_CHECKSUM + 4;
+
+    public static final String LOG_SUFFIX = ".log";
+
+    private RandomAccessFile file;
+    private FileChannel fc;
+    private Lock lock;
+
+    private long position;  // 当前日志指针的位置
+    private long fileSize;  // 初始化时记录，log操作不更新
+    private int xChecksum;  // 日志总的校验和
+
+    LoggerImpl(RandomAccessFile raf, FileChannel fc) {
+        this.file = raf;
+        this.fc = fc;
+        lock = new ReentrantLock();
+    }
+
+    LoggerImpl(RandomAccessFile raf, FileChannel fc, int xChecksum) {
+        this.file = raf;
+        this.fc = fc;
+        this.xChecksum = xChecksum;
+        lock = new ReentrantLock();
+    }
+
+    /**
+     * 初始化日志文件，读取并验证 XChecksum，移除 Bad Tail
+     */
+    void init() {
+        long size = 0;
+        try {
+            size = file.length();
+        } catch (IOException e) {
+            Panic.panic(e);
+        }
+        if(size < 4) {
+            Panic.panic(Error.BadLogFileException);
+        }
+
+        // 读取并解析 XChecksum
+        ByteBuffer raw = ByteBuffer.allocate(4);
+        try {
+            fc.position(0);
+            fc.read(raw);
+        } catch (IOException e) {
+            Panic.panic(e);
+        }
+        int xChecksum = Parser.parseInt(raw.array());
+        this.fileSize = size;
+        this.xChecksum = xChecksum;
+
+        checkAndRemoveTail();
+    }
+
+    /**
+     * 从文件中读取下一条日志，如果日志是Bad Tail或读完最后一条日志则返回null。
+     */
+    private byte[] internNext() {
+        if(position + OF_DATA >= fileSize) {
+            return null;
+        }
+        // 读取日志条目的大小（前四个字节）
+        ByteBuffer tmp = ByteBuffer.allocate(4);
+        try {
+            fc.position(position);
+            fc.read(tmp);
+        } catch(IOException e) {
+            Panic.panic(e);
+        }
+        int size = Parser.parseInt(tmp.array());
+        if(position + size + OF_DATA > fileSize) {
+            return null;
+        }
+
+        // 读取完整的日志条目（包括大小、校验和、数据）
+        ByteBuffer buf = ByteBuffer.allocate(OF_DATA + size);
+        try {
+            fc.position(position);
+            fc.read(buf);
+        } catch(IOException e) {
+            Panic.panic(e);
+        }
+
+        // 通过校验和验证日志条目的完整性
+        byte[] log = buf.array();
+        int checkSum1 = calChecksum(0, Arrays.copyOfRange(log, OF_DATA, log.length));
+        int checkSum2 = Parser.parseInt(Arrays.copyOfRange(log, OF_CHECKSUM, OF_DATA));
+        if(checkSum1 != checkSum2) {
+            return null;
+        }
+
+        position += log.length;
+        return log;
+    }
+
+    /**
+     * 计算校验和函数
+     */
+    private int calChecksum(int xCheck, byte[] log) {
+        for (byte b : log) {
+            xCheck = xCheck * SEED + b;
+        }
+        return xCheck;
+    }
+
+
+    /**
+     * 检查并移除Bad Tail
+     * Bad Tail 可能出现在数据库异常关闭时，最后一条日志可能只写入了部分数据
+     */
+    private void checkAndRemoveTail() {
+        rewind();
+
+        int xCheck = 0;
+        while(true) {
+            byte[] log = internNext();
+            if(log == null) break;
+            xCheck = calChecksum(xCheck, log);
+        }
+
+        if(xCheck != xChecksum) {
+            Panic.panic(Error.BadLogFileException);
+        }
+
+        try {
+            // 截断文件，移除Bad Tail
+            truncate(position);
+        } catch (Exception e) {
+            Panic.panic(e);
+        }
+        try {
+            // 将文件指针重新定位到截断位置
+            file.seek(position);
+        } catch (IOException e) {
+            Panic.panic(e);
+        }
+        rewind();
+    }
+
+
+    /**
+     * 记录一条日志，参数是新增的日志数据
+     */
+    @Override
+    public void log(byte[] data) {
+        byte[] log = wrapLog(data);
+
+        ByteBuffer buf = ByteBuffer.wrap(log);
+        lock.lock();
+        try {
+            fc.position(fc.size());
+            fc.write(buf);
+        } catch(IOException e) {
+            Panic.panic(e);
+        } finally {
+            lock.unlock();
+        }
+        updateXChecksum(log);
+    }
+
+    /**
+     * 包装日志条目，添加Size和校验和
+     */
+    private byte[] wrapLog(byte[] data) {
+        byte[] checksum = Parser.int2Byte(calChecksum(0, data));
+        byte[] size = Parser.int2Byte(data.length);
+        return Bytes.concat(size, checksum, data);
+    }
+
+    /**
+     * 更新整体日志的校验和 XChecksum
+     */
+    private void updateXChecksum(byte[] log) {
+        this.xChecksum = calChecksum(this.xChecksum, log);
+        try {
+            fc.position(0);
+            fc.write(ByteBuffer.wrap(Parser.int2Byte(xChecksum)));
+            fc.force(false);
+        } catch(IOException e) {
+            Panic.panic(e);
+        }
+    }
+
+    /**
+     * 截断日志文件到指定位置
+     */
+    @Override
+    public void truncate(long x) throws Exception {
+        lock.lock();
+        try {
+            fc.truncate(x);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * 读取下一条日志，如果没有更多日志则返回null。
+     */
+    @Override
+    public byte[] next() {
+        lock.lock();
+        try {
+            byte[] log = internNext();
+            if(log == null) return null;
+            return Arrays.copyOfRange(log, OF_DATA, log.length);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * 将日志读取指针重置到日志文件的起始位置。
+     */
+    @Override
+    public void rewind() {
+        position = 4;
+    }
+
+    /**
+     * 关闭日志文件并释放相关资源
+     */
+    @Override
+    public void close() {
+        try {
+            fc.close();
+            file.close();
+        } catch(IOException e) {
+            Panic.panic(e);
+        }
+    }
+}

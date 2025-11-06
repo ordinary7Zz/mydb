@@ -12,3 +12,4 @@ public interface Page {
     int getPageNumber();
     byte[] getData();
 }
+

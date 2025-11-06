@@ -11,13 +11,16 @@ import java.util.concurrent.locks.ReentrantLock;
  * AbstractCache 实现了一个引用计数策略的缓存
  */
 public abstract class AbstractCache<T> {
-    private HashMap<Long, T> cache;   // {key,data}，key是资源data的唯一标识符。data是实际缓存的数据
-    private HashMap<Long, Integer> references;  //{key,num},key是资源data的唯一标识符，num是该资源的引用个数
-    private HashMap<Long, Boolean> getting;   //{key,isUse}，标记哪些资源当前正在从数据源中获取。避免高并发情况下的多个线程同时从数据库中重建资源
+    // {key,data}，key是资源data的唯一标识符。data是实际缓存的数据
+    private HashMap<Long, T> cache;
+    //{key,num},key是资源data的唯一标识符，num是该资源的引用个数
+    private HashMap<Long, Integer> references;
+    //{key,isUse}，标记哪些资源当前正在从数据源中获取。
+    // 避免高并发情况下的多个线程同时从数据库中重建资源
+    private HashMap<Long, Boolean> getting;
 
-
-    private int maxResource;                            // 缓存的最大缓存资源数
-    private int count = 0;                              // 缓存中元素的个数
+    private int maxResource;   // 缓存的最大缓存资源数
+    private int count = 0;     // 缓存中元素的个数
     private Lock lock;
 
     public AbstractCache(int maxResource) {
@@ -91,6 +94,9 @@ public abstract class AbstractCache<T> {
         return obj;
     }
 
+    /**
+     * 减少引用计数,当引用计数归零时从缓存中清除
+     */
     protected void release(long key) {
         lock.lock();
         try{
