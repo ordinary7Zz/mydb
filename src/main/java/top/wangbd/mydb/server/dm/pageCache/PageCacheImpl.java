@@ -12,6 +12,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class PageCacheImpl extends AbstractCache<Page> implements PageCache {
 
@@ -30,6 +31,16 @@ public class PageCacheImpl extends AbstractCache<Page> implements PageCache {
         if(maxResource < MEM_MIN_LIM) {
             Panic.panic(Error.MemTooSmallException);
         }
+        long length = 0;
+        try {
+            length = file.length();
+        } catch (IOException e) {
+            Panic.panic(e);
+        }
+        this.file = file;
+        this.fc = fileChannel;
+        this.fileLock = new ReentrantLock();
+        this.pageNumbers = new AtomicInteger((int)length / PAGE_SIZE);
     }
 
     private static long pageOffset(int pgno) {

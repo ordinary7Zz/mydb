@@ -241,8 +241,8 @@ public class Recover {
         }
         try {
             if (flag == UNDO){
-                // 把数据的有效位置为0，因此下面的插入不在else内，而是必经路径
-                // TODO DataItem UNDO操作
+                // 把数据的有效位置为无效，因此下面的插入不在else内，而是必经路径
+                DataItem.setDataItemRawInvalid(li.raw);
             }
             // 向该页指定偏移位置插入数据
             PageX.recoverInsert(pg, li.raw, li.offset);

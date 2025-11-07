@@ -18,9 +18,16 @@ public class PageX {
     public static final int MAX_FREE_SPACE = 10;  // 页面中可用于存储数据的最大空闲空间大小
 
 
-    /**
-     * 将 raw 插入 page 中，返回插入位置
-     */
+    /*** 初始化普通页的原始数据*/
+    public static byte[] initRaw() {
+        // 创建一个新的字节数组，大小为页面大小（通常为8KB）。
+        byte[] raw = new byte[PageCache.PAGE_SIZE];
+        // 将空闲空间偏移量（FSO）设置为数据部分的起始位置。
+        setFSO(raw, OF_DATA);
+        return raw;
+    }
+
+    /*** 将 raw 插入 page 中，返回插入位置*/
     public static short insert(Page pg, byte[] raw) {
         pg.setDirty(true);
         short offset = getFSO(pg.getData());
@@ -29,39 +36,29 @@ public class PageX {
         return offset;
     }
 
-    /**
-     * 设置新空闲位置的偏移 到 这一页的前两个字节
-     * FSO：Free Space Offset
-     */
+    /*** 设置新空闲位置的偏移 到 这一页的前两个字节
+     * FSO：Free Space Offset*/
     private static void setFSO(byte[] raw, short ofData) {
         System.arraycopy(Parser.short2Byte(ofData), 0, raw, OF_FREE, OF_DATA);
     }
 
-    /**
-     * 获取 page 的 FSO
-     */
+    /*** 获取 page 的 FSO*/
     public static short getFSO(Page pg) {
         return getFSO(pg.getData());
     }
 
-    /**
-     * 根据这一页的前两个字节 获得 空闲位置的偏移
-     */
+    /*** 根据这一页的前两个字节 获得 空闲位置的偏移*/
     private static short getFSO(byte[] raw) {
         return Parser.parseShort(Arrays.copyOfRange(raw, 0, 2));
     }
 
-    /**
-     * 获取页面的空闲空间大小
-     */
+    /*** 获取页面的空闲空间大小*/
     public static int getFreeSpace(Page pg) {
         return PageCache.PAGE_SIZE - (int)getFSO(pg.getData());
     }
 
-    /**
-     * 将 raw 插入 page 中的 offset 位置，并将 pg 的 offset 设置为较大的 offset
-     * 用于在数据库崩溃后重新打开时，恢复例程直接插入数据使用。
-     */
+    /*** 将 raw 插入 page 中的 offset 位置，并将 pg 的 offset 设置为较大的 offset
+     * 用于在数据库崩溃后重新打开时，恢复例程直接插入数据使用。*/
     public static void recoverInsert(Page pg, byte[] raw, short offset) {
         pg.setDirty(true);
         System.arraycopy(raw, 0, pg.getData(), offset, raw.length);
@@ -72,10 +69,8 @@ public class PageX {
         }
     }
 
-    /**
-     * 将raw插入pg中的offset位置，不更新update
-     * 用于在数据库崩溃后重新打开时，恢复例程修改数据使用。
-     */
+    /*** 将raw插入pg中的offset位置，不更新update
+     * 用于在数据库崩溃后重新打开时，恢复例程修改数据使用。*/
     public static void recoverUpdate(Page pg, byte[] raw, short offset) {
         pg.setDirty(true); // 将pg的dirty标志设置为true，表示pg的数据已经被修改
         System.arraycopy(raw, 0, pg.getData(), offset, raw.length); // 将raw的数据复制到pg的数据中的offset位置

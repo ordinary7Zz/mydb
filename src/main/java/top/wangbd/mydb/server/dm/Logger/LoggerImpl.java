@@ -43,9 +43,7 @@ public class LoggerImpl implements Logger{
         lock = new ReentrantLock();
     }
 
-    /**
-     * 初始化日志文件，读取并验证 XChecksum，移除 Bad Tail
-     */
+    /*** 初始化日志文件，读取并验证 XChecksum，移除 Bad Tail*/
     void init() {
         long size = 0;
         try {

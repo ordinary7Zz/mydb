@@ -1,5 +1,6 @@
 package top.wangbd.mydb.server.dm.page;
 
+import top.wangbd.mydb.server.dm.pageCache.PageCache;
 import top.wangbd.mydb.server.utils.RandomUtil;
 
 import java.util.Arrays;
@@ -13,6 +14,15 @@ import java.util.Arrays;
 public class PageOne {
     private static final int OF_VC = 100;
     private static final int LEN_VC = 8;
+
+    /** 初始化第一页的原始数据 */
+    public static byte[] InitRaw() {
+        // 创建一个新的字节数组，大小为页面大小（通常为8KB）。
+        byte[] raw = new byte[PageCache.PAGE_SIZE];
+        // 调用 setVcOpen 方法，在 raw 数组的指定位置设置随机验证码。
+        setVcOpen(raw);
+        return raw;
+    }
 
     public static void setVcOpen(Page pg) {
         pg.setDirty(true);
