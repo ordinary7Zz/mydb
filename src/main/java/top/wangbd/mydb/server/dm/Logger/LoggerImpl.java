@@ -16,8 +16,8 @@ import java.util.concurrent.locks.ReentrantLock;
 public class LoggerImpl implements Logger{
     private static final int SEED = 13331;
 
-    private static final int OF_SIZE = 0;
-    private static final int OF_CHECKSUM = OF_SIZE + 4;
+    private static final int OF_SIZE = 0; // 尺寸 4字节
+    private static final int OF_CHECKSUM = OF_SIZE + 4; // 校验和 4字节
     private static final int OF_DATA = OF_CHECKSUM + 4;
 
     public static final String LOG_SUFFIX = ".log";
