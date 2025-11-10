@@ -52,12 +52,6 @@ public class DataManagerImpl extends AbstractCache<DataItem> implements DataMana
         return PageOne.checkVc(pageOne);
     }
 
-    /** 为xid生成update日志*/
-    public void logDataItem(long xid, DataItem di) {
-        byte[] log = Recover.updateLog(xid, di);
-        logger.log(log);
-    }
-
     /** 释放dataitem */
     public void releaseDataItem(DataItem di) {
         super.release(di.getUid());
@@ -97,6 +91,12 @@ public class DataManagerImpl extends AbstractCache<DataItem> implements DataMana
     @Override
     protected void releaseForCache(DataItem di) {
         di.page().release();
+    }
+
+    /** 为xid生成update日志*/
+    public void logDataItem(long xid, DataItem di) {
+        byte[] log = Recover.updateLog(xid, di);
+        logger.log(log);
     }
 
     @Override

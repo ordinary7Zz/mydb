@@ -29,6 +29,7 @@ public class PageX {
 
     /*** 将 raw 插入 page 中，返回插入位置*/
     public static short insert(Page pg, byte[] raw) {
+        // raw 是一条DataItem的完整数据，包括有效位和长度
         pg.setDirty(true);
         short offset = getFSO(pg.getData());
         System.arraycopy(raw, 0, pg.getData(), offset, raw.length);
