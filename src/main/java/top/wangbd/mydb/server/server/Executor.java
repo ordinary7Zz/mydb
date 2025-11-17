@@ -58,6 +58,7 @@ public class Executor {
         }
     }
 
+    /** 执行非事务相关语句 */
     private byte[] execute2(Object stat) throws Exception {
         boolean tmpTransaction = false;
         Exception e = null;

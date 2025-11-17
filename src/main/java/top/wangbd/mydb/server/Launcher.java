@@ -1,5 +1,6 @@
 package top.wangbd.mydb.server;
 
+import org.apache.commons.cli.*;
 import top.wangbd.mydb.common.Error;
 import top.wangbd.mydb.server.dm.DataManager;
 import top.wangbd.mydb.server.server.Server;
@@ -16,6 +17,7 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Scanner;
 
 public class Launcher {
     public static final int port = 9999;
@@ -31,6 +33,52 @@ public class Launcher {
 
     public static volatile boolean isDatabaseConnected = false;
 
+    public static void main(String[] args) throws ParseException, IOException {
+        // 创建Options对象 ：实例化 Options 类，用于存储和管理命令行选项定义
+        Options options = new Options();
+        options.addOption("open", true, "-open DBPath");
+        options.addOption("create", true, "-create DBPath");
+        options.addOption("mem", true, "-mem 64MB");
+        options.addOption("delete", true, "-delete DBPath"); // 新增删除选项
+        // 创建命令行解析器实例
+        CommandLineParser parser = new DefaultParser();
+        CommandLine cmd = parser.parse(options,args);
+        if(cmd.hasOption("open")) {
+            openDB(cmd.getOptionValue("open"), parseMem(cmd.getOptionValue("mem")));
+            return;
+        }
+        if(cmd.hasOption("create")) {
+            createDB(cmd.getOptionValue("create"));
+            return;
+        }
+        if(cmd.hasOption("delete")) {
+            deleteDB(cmd.getOptionValue("delete")); // 新增删除操作
+        }
+        System.out.println("Usage: launcher (open|create|delete) DBPath");
+
+    }
+
+    /** 创建数据库 */
+    private static void createDB(String path) {
+        // 检查路径是否存在
+        File directory = new File(path);
+        if (!directory.exists()) {
+            if (!directory.mkdirs()) {
+                System.err.println("无法创建目录: " + path);
+                return;
+            }
+        }
+        // 获取数据库文件应当存放的目录，文件名跟所在的目录名一致: C:\mydb\data\db1\db1[.xxx]
+        String dbFilePath = path+File.separator+path.substring(path.lastIndexOf(File.separator)+1);
+        TransactionManager tm = TransactionManager.create(dbFilePath);
+        DataManager dm = DataManager.create(dbFilePath, DEFALUT_MEM, tm);
+        VersionManager vm = new VersionManagerImpl(tm, dm);
+        TableManager.create(dbFilePath, vm, dm);
+        tm.close();
+        dm.close();
+    }
+
+    /** 打开数据库 */
     private static void openDB(String path, long mem) throws IOException {
         // 1.检查路径是否存在
         File directory = new File(path);
@@ -50,10 +98,8 @@ public class Launcher {
         // 读取.bt文件，构造TableManager
         TableManager tbm = TableManager.open(dbFilePath, vm, dm);
 
-//        isDatabaseConnected.set(true); // 设置数据库连接状态为已连接
-//        isDatabaseConnected=true;
         // 2.通过共享内存在客户端和服务端之间传递数据库连接状态
-        //2.1 创建或获取共享内存文件
+        // 2.1 创建或获取共享内存文件
         if (!SHARED_MEM_FILE.exists()) {
             try {
                 SHARED_MEM_FILE.createNewFile();
@@ -65,28 +111,25 @@ public class Launcher {
 
         RandomAccessFile raf = new RandomAccessFile(SHARED_MEM_FILE, "rw");
         FileChannel channel = raf.getChannel();
-        // 将文件映射到共享内存
+        // 2.2将文件映射到共享内存
         MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, BUFFER_SIZE);
-        // 设置数据库连接状态为正在使用
+        // 2.3设置数据库连接状态为正在使用
         buffer.put((byte) 1);
 
-
         // 3.启动服务端
-
         new Server(port, tbm).start();
 
     }
 
+    /** 删除数据库 */
     private static void deleteDB(String path) throws IOException {
-
         //1.判断是否有客户端连接到该数据库
         //1.1 创建或获取共享内存文件
         RandomAccessFile raf = new RandomAccessFile(SHARED_MEM_FILE, "rw");
         FileChannel channel = raf.getChannel();
-        // 将文件映射到共享内存
+        // 1.2将文件映射到共享内存
         MappedByteBuffer buffer = channel.map(FileChannel.MapMode.READ_WRITE, 0, BUFFER_SIZE);
-        // 获取数据库连接状态
-//        System.out.println(buffer.get());
+        // 1.3获取数据库连接状态
         byte status = buffer.get();
 
         if(status==1){
@@ -94,15 +137,15 @@ public class Launcher {
             return;
         }
 
+        // 2.检查路径是否存在，删除指定类型的文件
         File directory = new File(path);
         if (!directory.exists()) {
             System.err.println("数据库路径不存在: " + path);
             return;
         }
-
         System.out.println("即将删除数据库路径: " + path + " 下的以下类型文件: bt, db, log, xid");
         System.out.println("请确认是否继续... (Y/N)");
-        java.util.Scanner scanner = new java.util.Scanner(System.in);
+        Scanner scanner = new Scanner(System.in);
         String confirmation = scanner.nextLine().toUpperCase();
         if (!"Y".equals(confirmation)) {
             System.out.println("删除操作已取消。");
@@ -113,6 +156,7 @@ public class Launcher {
         deleteFiles(directory, fileExtensions);
     }
 
+    // 根据文件路径和扩展名，递归删除指定类型的文件
     private static void deleteFiles(File directory, List<String> fileExtensions) {
         if (directory.isDirectory()) {
             File[] files = directory.listFiles();
@@ -137,6 +181,7 @@ public class Launcher {
             }
         }
     }
+    /** 解析内存参数 */
     private static long parseMem(String memStr) {
         if(memStr == null || "".equals(memStr)) {
             return DEFALUT_MEM;
@@ -158,6 +203,4 @@ public class Launcher {
         }
         return DEFALUT_MEM;
     }
-
-
 }

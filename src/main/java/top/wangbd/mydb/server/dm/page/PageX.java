@@ -15,7 +15,7 @@ import java.util.Arrays;
 public class PageX {
     private static final short OF_FREE = 0; // 空闲空间偏移量（FSO）的起始位置
     private static final short OF_DATA = 2; // 页面中数据部分的起始位置
-    public static final int MAX_FREE_SPACE = 10;  // 页面中可用于存储数据的最大空闲空间大小
+    public static final int MAX_FREE_SPACE = PageCache.PAGE_SIZE - OF_DATA;  // 页面中可用于存储数据的最大空闲空间大小
 
 
     /*** 初始化普通页的原始数据*/
