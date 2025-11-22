@@ -160,6 +160,7 @@ public class VersionManagerImpl extends AbstractCache<Entry> implements VersionM
 
     @Override
     public void commit(long xid) throws Exception {
+        lock.lock();
         Transaction t = activeTransaction.get(xid);
         lock.unlock();
 
@@ -201,6 +202,7 @@ public class VersionManagerImpl extends AbstractCache<Entry> implements VersionM
 
     @Override
     protected Entry getForCache(long uid) throws Exception {
+        System.out.println("this is a entry getForCache");
         Entry entry = Entry.loadEntry(this, uid);
         if(entry == null) {
             throw Error.NullEntryException;

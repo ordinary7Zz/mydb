@@ -231,6 +231,7 @@ public class Table {
             l1 = res.l1; r1 = res.r1;
             single = res.single;
         }
+        // 这里就限制了每个表必须有一个索引字段，否则无法进行查询
         List<Long> uids = fd.search(l0, r0);
         if(!single) {
             List<Long> tmp = fd.search(l1, r1);
@@ -321,6 +322,21 @@ public class Table {
             sb.append(field.printValue(entry.get(field.fieldName)));
             if(i == fields.size()-1) {
                 sb.append("]");
+            } else {
+                sb.append(", ");
+            }
+        }
+        return sb.toString();
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder("{");
+        sb.append(name).append(": ");
+        for(Field field : fields) {
+            sb.append(field.toString());
+            if(field == fields.get(fields.size()-1)) {
+                sb.append("}");
             } else {
                 sb.append(", ");
             }

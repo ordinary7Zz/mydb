@@ -66,13 +66,13 @@ public class TableManagerImpl implements TableManager {
                 sb.append(tb.toString()).append("\n");
             }
             // TODO: 这样show tables 可能会导致重复的表？
-            List<Table> t = xidTableCache.get(xid);
-            if(t == null) {
-                return "\n".getBytes();
-            }
-            for (Table tb : t) {
-                sb.append(tb.toString()).append("\n");
-            }
+//            List<Table> t = xidTableCache.get(xid);
+//            if(t == null) {
+//                return "\n".getBytes();
+//            }
+//            for (Table tb : t) {
+//                sb.append(tb.toString()).append("\n");
+//            }
             return sb.toString().getBytes();
         } finally {
             lock.unlock();

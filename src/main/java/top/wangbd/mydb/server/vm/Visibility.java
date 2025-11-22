@@ -32,6 +32,7 @@ public class Visibility {
         long xid = t.xid;
         long xmin = e.getXmin();
         long xmax = e.getXmax();
+        if(xmin == xid && xmax == 0) return true;
 
         if(tm.isCommitted(xmin)) {
             if(xmax == 0) return true;
